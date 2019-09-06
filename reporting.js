@@ -117,6 +117,7 @@ Vault.read('secret/env').then(vault => {
                     }
 
                     let completed = false;
+                    let tryCount = 0;
                     while (!completed) {
                         const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
                         console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
@@ -131,6 +132,12 @@ Vault.read('secret/env').then(vault => {
                         }
 
                         if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
+                            if (tryCount > 3) {
+                                console.log('issue', isrc);
+                                logger.error(isrc);
+                            }
+
+                            tryCount += 1;
                             await sleep(1000);
                         } else {
                             completed = true;
