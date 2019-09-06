@@ -107,9 +107,15 @@ Vault.read('secret/env').then(vault => {
         ] }, async (err2, trackHistory) => {
             const fields = ['NAME_OF_SERVICE', 'FEATURED_ARTIST', 'SOUND_RECORDING_TITLE', 'ISRC', 'ACTUAL_TOTAL_PERFORMANCES'];
             const tracks = [];
-            let errorCount = 0;
+
             await asyncForEach(trackHistory, async history => {
                 if (history.track.isrc && history.listenCount > 0) {
+                    let { listenCount } = history;
+                    if (history.regionalListens && history.regionalListens.length) {
+                        const usListens = history.regionalListens.find(country => country.code === 'US');
+                        listenCount = (usListens && usListens.listenCount) || 0;
+                    }
+
                     let completed = false;
                     while (!completed) {
                         const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
@@ -120,7 +126,7 @@ Vault.read('secret/env').then(vault => {
                                 FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
                                 SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
                                 ISRC: isrc.recordings[0].isrc,
-                                ACTUAL_TOTAL_PERFORMANCES: history.listenCount,
+                                ACTUAL_TOTAL_PERFORMANCES: listenCount,
                             });
                         }
 
@@ -138,7 +144,7 @@ Vault.read('secret/env').then(vault => {
 
             fs.writeFile(`./reports/SoundExchangeROU-${ startDate.month() + 1 }-${ startDate.format('YYYY') }.csv`, csv, (err) => {
                 if (err) console.log(err);
-                console.log(`REPORT CREATED WITH ${ errorCount } ERRORS`);
+                console.log(`REPORT CREATED FOR MONTH: ${ MONTH }`);
             });
         }).populate({
             path:   'track',
