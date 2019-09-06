@@ -118,12 +118,9 @@ Vault.read('secret/env').then(vault => {
                         });
                     }
 
-                    if (!(isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc)) {
-                        logger.error(isrc);
-                    }
-
                     if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
                         errorCount += 1;
+                        logger.error(isrc);
                     }
                 }
             });
