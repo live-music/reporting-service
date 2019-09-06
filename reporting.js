@@ -145,6 +145,7 @@ Vault.read('secret/env').then(vault => {
             fs.writeFile(`./reports/SoundExchangeROU-${ startDate.month() + 1 }-${ startDate.format('YYYY') }.csv`, csv, (err) => {
                 if (err) console.log(err);
                 console.log(`REPORT CREATED FOR MONTH: ${ MONTH }`);
+                process.exit();
             });
         }).populate({
             path:   'track',
