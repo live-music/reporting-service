@@ -127,7 +127,7 @@ Vault.read('secret/env').then(vault => {
                         if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
                             errorCount += 1;
                             logger.error(isrc);
-                            sleep(1000);
+                            await sleep(1000);
                         } else {
                             completed = true;
                         }
