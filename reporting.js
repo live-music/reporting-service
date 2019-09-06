@@ -113,7 +113,7 @@ Vault.read('secret/env').then(vault => {
                     let completed = false;
                     while (!completed) {
                         const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
-                        console.log('FOUND ISRC', isrc);
+                        console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
                         if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
                             tracks.push({
                                 NAME_OF_SERVICE: 'CUE Music',
@@ -125,8 +125,6 @@ Vault.read('secret/env').then(vault => {
                         }
 
                         if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
-                            errorCount += 1;
-                            logger.error(isrc);
                             await sleep(1000);
                         } else {
                             completed = true;
