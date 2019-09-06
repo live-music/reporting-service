@@ -53,6 +53,10 @@ Vault.read('secret/env').then(vault => {
         format: winston.format.simple()
     }));
 
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     async function checkISRC(isrc) {
         const obj = {
             method: 'POST',
@@ -106,21 +110,27 @@ Vault.read('secret/env').then(vault => {
             let errorCount = 0;
             await asyncForEach(trackHistory, async history => {
                 if (history.track.isrc && history.listenCount > 0) {
-                    const isrc = await checkISRC(history.track.isrc);
-                    console.log('FOUND ISRC', isrc);
-                    if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
-                        tracks.push({
-                            NAME_OF_SERVICE: 'CUE Music',
-                            FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
-                            SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
-                            ISRC: isrc.recordings[0].isrc,
-                            ACTUAL_TOTAL_PERFORMANCES: history.listenCount,
-                        });
-                    }
+                    let completed = false;
+                    while (!completed) {
+                        const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
+                        console.log('FOUND ISRC', isrc);
+                        if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
+                            tracks.push({
+                                NAME_OF_SERVICE: 'CUE Music',
+                                FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
+                                SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
+                                ISRC: isrc.recordings[0].isrc,
+                                ACTUAL_TOTAL_PERFORMANCES: history.listenCount,
+                            });
+                        }
 
-                    if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
-                        errorCount += 1;
-                        logger.error(isrc);
+                        if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
+                            errorCount += 1;
+                            logger.error(isrc);
+                            sleep(1000);
+                        } else {
+                            completed = true;
+                        }
                     }
                 }
             });
