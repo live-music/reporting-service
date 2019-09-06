@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const ENV = process.env;
+const MONTH = process.argv.slice(2)[0];
 const fs = require('fs');
 const winston = require('winston');
 const mongoose = require('mongoose');
@@ -25,16 +26,15 @@ const models = require('./models');
 
 Vault.read('secret/env').then(vault => {
     const secrets = vault.data;
-    const SERVICE_KEY = secrets.service_key;
     const SOUNDEXCHANGE_KEY = secrets.soundexchange_key;
 
-    let Set;
+    let TrackHistory;
     let initialized = false;
     const initialize = setInterval(() => {
         models.initialize().then(() => {
             mongoose.connect(secrets.mongo_driver);
 
-            Set = mongoose.model('Set');
+            TrackHistory = mongoose.model('TrackHistory');
             initialized = true;
             clearInterval(initialize);
         });
@@ -77,91 +77,55 @@ Vault.read('secret/env').then(vault => {
         return json;
     }
 
-    function generateReport() {
-        console.log('GENERATING REPORT FOR MONTH: ', moment().subtract(2, 'months').month());
-        const startDate = moment().subtract(2, 'months').startOf('month');
-        const endDate = moment().subtract(2, 'months').endOf('month');
-
-        Set.find({ $and: [
-            { startTime: { $gte: startDate } },
-            { endTime: { $lte: endDate } }
-        ] }, (err2, sets) => {
-            const fields = ['NAME_OF_SERVICE', 'FEATURED_ARTIST', 'SOUND_RECORDING_TITLE', 'ISRC', 'ACTUAL_TOTAL_PERFORMANCES'];
-            const tracks = [];
-            let count = 0;
-            let iteration = 0;
-            let errorCount = 0;
-            sets.forEach(set => {
-                set.tracks.forEach(track => {
-                    if (track.track.isrc && track.listenCount > 0) {
-                        setTimeout(async () => {
-                            const isrc = await checkISRC(track.track.isrc);
-                            console.log('FOUND ISRC', isrc);
-                            if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
-                                console.log('STORING TRACK');
-                                tracks.push({
-                                    NAME_OF_SERVICE: 'CUE Music',
-                                    FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
-                                    SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
-                                    ISRC: isrc.recordings[0].isrc,
-                                    ACTUAL_TOTAL_PERFORMANCES: track.listenCount,
-                                });
-                            }
-
-                            if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
-                                errorCount += 1;
-                            }
-                        }, count);
-                        count += 500;
-                        iteration += 1;
-                    }
-                });
-            });
-
-            console.log('total wait: ', iteration * 500);
-            setTimeout(() => {
-                const json2csvParser = new Json2csvParser({ fields });
-                const csv = json2csvParser.parse(tracks);
-
-                fs.writeFile(`./reports/SoundExchangeROU-${ startDate.month() + 1 }-${ startDate.format('YYYY') }.csv`, csv, (err) => {
-                    if (err) console.log(err);
-                    console.log(`REPORT CREATED WITH ${ errorCount } ERRORS`);
-                });
-            }, (iteration + 5) * 500);
-
-            // res.attachment(`SoundExchangeROU${ req.body.month }-${ req.body.year }`);
-            // res.type('csv');
-            // return res.send(csv);
-        }).select('tracks')
-        .populate({
-            path:   'tracks.track',
-        });
+    async function asyncForEach(array, callback) {
+        for (let index = 0; index < array.length; index++) {
+            await callback(array[index], index, array); // eslint-disable-line
+        }
     }
 
-    function generateRoyaltyReport() {
-        const startDate = moment().subtract(1, 'months').startOf('month');
-        const endDate = moment().subtract(1, 'months').endOf('month');
+    async function generateReport() {
+        // console.log('GENERATING REPORT FOR MONTH: ', moment().subtract(2, 'months').month());
+        let startDate;
+        let endDate;
+        if (MONTH) {
+            console.log('GENERATING REPORT FOR MONTH:', MONTH);
+            startDate = moment([2019, MONTH - 1]); // Use actual number of month (e.g. January is month 1 in request);
+            endDate = moment(startDate).endOf('month');
+        } else {
+            console.log('GENERATING REPORT FOR CURRENT MONTH');
+            startDate = moment().startOf('month');
+            endDate = moment().endOf('month');
+        }
 
-        Set.find({
-            $and: [
-                { startTime: { $gte: startDate } },
-                { endTime: { $lte: endDate } }
-            ]
-        }, (err2, sets) => {
+        await TrackHistory.find({ $and: [
+            { timestamp: { $gte: startDate } },
+            { timestamp: { $lte: endDate } }
+        ] }, async (err2, trackHistory) => {
             const fields = ['NAME_OF_SERVICE', 'FEATURED_ARTIST', 'SOUND_RECORDING_TITLE', 'ISRC', 'ACTUAL_TOTAL_PERFORMANCES'];
             const tracks = [];
-            sets.forEach(set => {
-                set.tracks.forEach(track => {
-                    if (track && track.track && track.listenCount > 0 && track.track.isrc && track.track.soundexchangeArtist && track.track.soundexchangeTitle) {
+            let errorCount = 0;
+            await asyncForEach(trackHistory, async history => {
+                if (history.track.isrc && history.listenCount > 0) {
+                    const isrc = await checkISRC(history.track.isrc);
+                    console.log('FOUND ISRC', isrc);
+                    if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
                         tracks.push({
                             NAME_OF_SERVICE: 'CUE Music',
-                            FEATURED_ARTIST: track.track.soundexchangeArtist,
-                            SOUND_RECORDING_TITLE: track.track.soundexchangeTitle,
-                            ISRC: track.track.isrc,
-                            ACTUAL_TOTAL_PERFORMANCES: track.listenCount,
+                            FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
+                            SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
+                            ISRC: isrc.recordings[0].isrc,
+                            ACTUAL_TOTAL_PERFORMANCES: history.listenCount,
                         });
                     }
-                });
+
+                    if (!(isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc)) {
+                        logger.error(isrc);
+                    }
+
+                    if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
+                        errorCount += 1;
+                    }
+                }
             });
 
             const json2csvParser = new Json2csvParser({ fields });
@@ -169,23 +133,69 @@ Vault.read('secret/env').then(vault => {
 
             fs.writeFile(`./reports/SoundExchangeROU-${ startDate.month() + 1 }-${ startDate.format('YYYY') }.csv`, csv, (err) => {
                 if (err) console.log(err);
+                console.log(`REPORT CREATED WITH ${ errorCount } ERRORS`);
             });
-        }).select('tracks')
-        .populate({
-            path:   'tracks.track',
+        }).populate({
+            path:   'track',
+            select: 'artist title isrc'
         });
-    };
+    }
+
+    const generating = setInterval(() => {
+        if (initialized) {
+            generateReport();
+            clearInterval(generating);
+        }
+    }, 1000);
+
+    // function generateRoyaltyReport() {
+    //     const startDate = moment().subtract(1, 'months').startOf('month');
+    //     const endDate = moment().subtract(1, 'months').endOf('month');
+
+    //     Set.find({
+    //         $and: [
+    //             { startTime: { $gte: startDate } },
+    //             { endTime: { $lte: endDate } }
+    //         ]
+    //     }, (err2, sets) => {
+    //         const fields = ['NAME_OF_SERVICE', 'FEATURED_ARTIST', 'SOUND_RECORDING_TITLE', 'ISRC', 'ACTUAL_TOTAL_PERFORMANCES'];
+    //         const tracks = [];
+    //         sets.forEach(set => {
+    //             set.tracks.forEach(track => {
+    //                 if (track && track.track && track.listenCount > 0 && track.track.isrc && track.track.soundexchangeArtist && track.track.soundexchangeTitle) {
+    //                     tracks.push({
+    //                         NAME_OF_SERVICE: 'CUE Music',
+    //                         FEATURED_ARTIST: track.track.soundexchangeArtist,
+    //                         SOUND_RECORDING_TITLE: track.track.soundexchangeTitle,
+    //                         ISRC: track.track.isrc,
+    //                         ACTUAL_TOTAL_PERFORMANCES: track.listenCount,
+    //                     });
+    //                 }
+    //             });
+    //         });
+
+    //         const json2csvParser = new Json2csvParser({ fields });
+    //         const csv = json2csvParser.parse(tracks);
+
+    //         fs.writeFile(`./reports/SoundExchangeROU-${ startDate.month() + 1 }-${ startDate.format('YYYY') }.csv`, csv, (err) => {
+    //             if (err) console.log(err);
+    //         });
+    //     }).select('tracks')
+    //     .populate({
+    //         path:   'tracks.track',
+    //     });
+    // };
 
     // Notify room subscribers every morning of upcoming sets, check every 15 minutes
-    const interval = 15 * 60 * 1000;
-    const timeUntilInterval = 15 - Number(moment(Math.ceil(Date.parse(new Date()) % interval)).format('mm'));
-    setTimeout(() => {
-        console.log(`generating report in ${ timeUntilInterval } minutes`);
-        if (initialized) generateReport();
-        setInterval(() => {
-            console.log('generating report...');
-        }, 60000 * 15);
-    }, 5000); // timeUntilInterval * 100);
+    // const interval = 15 * 60 * 1000;
+    // const timeUntilInterval = 15 - Number(moment(Math.ceil(Date.parse(new Date()) % interval)).format('mm'));
+    // setTimeout(() => {
+    //     console.log(`generating report in ${ timeUntilInterval } minutes`);
+    //     if (initialized) generateReport();
+    //     setInterval(() => {
+    //         console.log('generating report...');
+    //     }, 60000 * 15);
+    // }, 5000); // timeUntilInterval * 100);
 
     // function verify(token, res, callback) {
     //     try {
