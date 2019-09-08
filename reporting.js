@@ -113,7 +113,11 @@ Vault.read('secret/env').then(vault => {
                     let { listenCount } = history;
                     if (history.regionalListens && history.regionalListens.length) {
                         const usListens = history.regionalListens.find(country => country.code === 'US');
-                        listenCount = (usListens && usListens.listenCount < listenCount && usListens.listenCount) || 0;
+                        if (usListens) {
+                            if (usListens.listenCount < listenCount) listenCount = usListens.listenCount;
+                        } else {
+                            listenCount = 0;
+                        }
                     }
 
                     if (listenCount > 0) {
