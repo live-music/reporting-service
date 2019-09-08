@@ -122,7 +122,6 @@ Vault.read('secret/env').then(vault => {
                         const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
                         console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
                         if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
-                            console.log('ISRC:', isrc);
                             tracks.push({
                                 NAME_OF_SERVICE: 'CUE Music',
                                 FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
