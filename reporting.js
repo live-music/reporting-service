@@ -119,6 +119,7 @@ Vault.read('secret/env').then(vault => {
                     let completed = false;
                     let tryCount = 0;
                     while (!completed) {
+                        // REMOVE CHECK FOR ISRC AND USE EXISTING SOUNDEXCHANGE DATA
                         const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
                         console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
                         if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
@@ -126,7 +127,7 @@ Vault.read('secret/env').then(vault => {
                                 NAME_OF_SERVICE: 'CUE Music',
                                 FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
                                 SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
-                                ISRC: isrc,
+                                ISRC: isrc.recordings[0].isrc,
                                 ACTUAL_TOTAL_PERFORMANCES: listenCount,
                             });
                         }
