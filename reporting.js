@@ -163,7 +163,7 @@ Vault.read('secret/env').then(vault => {
             });
         }).populate({
             path:   'track',
-            select: 'artist title isrc'
+            select: 'artist title isrc soundexchangeArtist soundexchangeTitle'
         });
     }
 
