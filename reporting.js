@@ -121,34 +121,34 @@ Vault.read('secret/env').then(vault => {
                     }
 
                     if (listenCount > 0) {
-                        let completed = false;
-                        let tryCount = 0;
-                        while (!completed) {
-                            // REMOVE CHECK FOR ISRC AND USE EXISTING SOUNDEXCHANGE DATA
-                            const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
-                            console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
-                            if (isrc.recordings && isrc.recordings[0] && isrc.recordings[0].isrc) {
-                                tracks.push({
-                                    NAME_OF_SERVICE: 'CUE Music',
-                                    FEATURED_ARTIST: isrc.recordings[0].recordingArtistName.replace(' ♦', ', '),
-                                    SOUND_RECORDING_TITLE: isrc.recordings[0].recordingTitle,
-                                    ISRC: isrc.recordings[0].isrc,
-                                    ACTUAL_TOTAL_PERFORMANCES: listenCount,
-                                });
-                            }
-
-                            if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
-                                if (tryCount > 3) {
-                                    console.log('issue', isrc);
-                                    logger.error(isrc);
-                                }
-
-                                tryCount += 1;
-                                await sleep(1000);
-                            } else {
-                                completed = true;
-                            }
+                        if (history.track.soundexchangeArtist && history.track.soundexchangeTitle) {
+                            console.log('WRITING: ', history.track.title, history.track.artist);
+                            tracks.push({
+                                NAME_OF_SERVICE: 'CUE Music',
+                                FEATURED_ARTIST: history.track.soundexchangeArtist.replace(' ♦', ', '),
+                                SOUND_RECORDING_TITLE: history.track.soundexchangeTitle,
+                                ISRC: history.track.isrc,
+                                ACTUAL_TOTAL_PERFORMANCES: listenCount,
+                            });
                         }
+                        // let completed = false;
+                        // let tryCount = 0;
+                        // while (!completed) {
+                        //     // REMOVE CHECK FOR ISRC AND USE EXISTING SOUNDEXCHANGE DATA
+                        //     // const isrc = await checkISRC(history.track.isrc); // eslint-disable-line
+                        //     // console.log('GETTING ISRC FOR: ', history.track.title, history.track.artist);
+                        //     if (isrc.message === 'Limit Exceeded' || isrc.message === 'Too Many Requests') {
+                        //         if (tryCount > 3) {
+                        //             console.log('issue', isrc);
+                        //             logger.error(isrc);
+                        //         }
+
+                        //         tryCount += 1;
+                        //         await sleep(1000);
+                        //     } else {
+                        //         completed = true;
+                        //     }
+                        // }
                     }
                 }
             });
