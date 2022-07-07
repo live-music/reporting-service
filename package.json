@@ -22,7 +22,7 @@
     "http": "^0.0.0",
     "json2csv": "^4.5.1",
     "jsonwebtoken": "^8.0.1",
-    "moment": "^2.23.0",
+    "moment": "^2.29.4",
     "moment-timezone": "^0.5.23",
     "mongoose": "^5.4.2",
     "mongoose_schema-json": "^1.0.3",
